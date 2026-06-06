@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindClone — Seu Cérebro Digital</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --card: #16161f; --border: #2a2a3a;
+    --accent: #7c6af7; --accent2: #f76ac8; --accent3: #6af7c8;
+    --text: #e8e8f0; --muted: #6b6b8a; --danger: #f76a6a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 999; }
+  .orb { position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; opacity: 0.15; }
+  .orb1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; }
+  .orb2 { width: 300px; height: 300px; background: var(--accent2); bottom: -80px; right: -80px; }
+  .app { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 32px 0 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .brain-icon { width: 44px; height: 44px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; animation: pulse 3s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,106,247,.4)}50%{box-shadow:0 0 0 12px rgba(124,106,247,0)} }
+  .logo-text h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-text span { font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
+  .tab { padding: 8px 14px; border-radius: 7px; border: none; background: transparent; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .2s; }
+  .tab.active { background: var(--accent); color: white; }
+  .section { display: none; padding: 28px 0; }
+  .section.active { display: block; }
+  .status-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 8px var(--accent3); animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+  .status-text { font-size: 13px; color: var(--muted); font-family: 'Space Mono', monospace; flex: 1; }
+  .memory-count { font-size: 12px; background: rgba(124,106,247,.15); color: var(--accent); border: 1px solid rgba(124,106,247,.3); padding: 4px 10px; border-radius: 20px; font-family: 'Space Mono', monospace; }
+  .chat-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; height: 520px; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .message { display: flex; gap: 10px; align-items: flex-start; animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+  .message.user { flex-direction: row-reverse; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .avatar.clone { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .avatar.user { background: var(--card); border: 1px solid var(--border); }
+  .bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.6; }
+  .message.clone .bubble { background: var(--card); border: 1px solid var(--border); border-top-left-radius: 4px; }
+  .message.user .bubble { background: linear-gradient(135deg, var(--accent), #5a4fd4); border-top-right-radius: 4px; color: white; }
+  .bubble-meta { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 4px; }
+  .message.user .bubble-meta { text-align: right; }
+  .typing { display: flex; gap: 4px; padding: 14px 16px; align-items: center; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: typingDot 1.2s ease-in-out infinite; }
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes typingDot { 0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1} }
+  .chat-input-area { border-top: 1px solid var(--border); padding: 14px 16px; display: flex; gap: 10px; align-items: flex-end; }
+  .chat-input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; padding: 10px 14px; resize: none; outline: none; max-height: 100px; transition: border-color .2s; }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-input::placeholder { color: var(--muted); }
+  .send-btn { width: 42px; height: 42px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--accent), #5a4fd4); color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform .15s, opacity .15s; flex-shrink: 0; }
+  .send-btn:hover { transform: scale(1.05); }
+  .send-btn:active { transform: scale(.96); }
+  .send-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .section-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .section-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 22px; font-family: 'Space Mono', monospace; }
+  .teach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  @media(max-width:600px){.teach-grid{grid-template-columns:1fr}}
+  .teach-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; cursor: pointer; transition: border-color .2s, transform .2s; position: relative; overflow: hidden; }
+  .teach-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .teach-card.selected { border-color: var(--accent); background: rgba(124,106,247,.05); }
+  .card-icon { font-size: 28px; margin-bottom: 10px; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .teach-form { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .form-input,.form-textarea { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; padding: 11px 14px; outline: none; transition: border-color .2s; }
+  .form-input:focus,.form-textarea:focus { border-color: var(--accent); }
+  .form-textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
+  .save-btn { width: 100%; padding: 13px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--accent), #5a4fd4); color: white; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .15s; }
+  .save-btn:hover { opacity: .9; }
+  .save-btn:active { transform: scale(.98); }
+  .save-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .memory-list { display: flex; flex-direction: column; gap: 10px; }
+  .memory-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; animation: fadeUp .3s ease; }
+  .memory-tag { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-family: 'Space Mono', monospace; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .tag-personalidade{background:rgba(124,106,247,.15);color:var(--accent);border:1px solid rgba(124,106,247,.3)}
+  .tag-opiniao{background:rgba(247,106,200,.15);color:var(--accent2);border:1px solid rgba(247,106,200,.3)}
+  .tag-historia{background:rgba(106,247,200,.15);color:var(--accent3);border:1px solid rgba(106,247,200,.3)}
+  .tag-habito{background:rgba(247,200,106,.15);color:#f7c86a;border:1px solid rgba(247,200,106,.3)}
+  .tag-conhecimento{background:rgba(106,200,247,.15);color:#6ac8f7;border:1px solid rgba(106,200,247,.3)}
+  .memory-content { flex: 1; }
+  .memory-key { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .memory-value { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .delete-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px; transition: color .2s; flex-shrink: 0; }
+  .delete-btn:hover { color: var(--danger); }
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: .4; }
+  .config-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .config-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+  .api-key-input { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px; padding: 11px 14px; outline: none; transition: border-color .2s; }
+  .api-key-input:focus { border-color: var(--accent); }
+  .config-hint { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: 'Space Mono', monospace; line-height: 1.5; }
+  .config-hint a { color: var(--accent); text-decoration: none; }
+  .persona-textarea { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 13px; padding: 11px 14px; outline: none; transition: border-color .2s; resize: vertical; min-height: 120px; line-height: 1.6; }
+  .persona-textarea:focus { border-color: var(--accent); }
+  .save-config-btn { margin-top: 4px; padding: 11px 20px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--accent), #5a4fd4); color: white; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+  .save-config-btn:hover { opacity: .9; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--accent); color: var(--text); padding: 12px 18px; border-radius: 10px; font-size: 13px; font-family: 'Space Mono', monospace; z-index: 1000; animation: toastIn .3s ease; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+  @keyframes toastIn { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  .search-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; padding: 10px 14px; outline: none; margin-bottom: 16px; transition: border-color .2s; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  .loading-overlay { text-align: center; padding: 40px; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="brain-icon">🧠</div>
+      <div class="logo-text">
+        <h1>MindClone</h1>
+        <span>// seu cérebro digital</span>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('chat',this)">Conversar</button>
+      <button class="tab" onclick="switchTab('ensinar',this)">Ensinar</button>
+      <button class="tab" onclick="switchTab('memorias',this)">Memórias</button>
+      <button class="tab" onclick="switchTab('config',this)">Config</button>
+    </div>
+  </header>
+
+  <!-- CHAT -->
+  <div class="section active" id="tab-chat">
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <div class="status-text" id="clone-name-display">Carregando clone...</div>
+      <div class="memory-count" id="mem-count">0 memórias</div>
+    </div>
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="message clone">
+          <div class="avatar clone">🧠</div>
+          <div>
+            <div class="bubble">Olá! Sou seu clone mental. Quanto mais você me ensinar, mais eu me parecerei com você. O que quer saber?</div>
+            <div class="bubble-meta">agora mesmo</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <textarea class="chat-input" id="chat-input" placeholder="Fale com seu clone..." rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENSINAR -->
+  <div class="section" id="tab-ensinar">
+    <div class="section-title">Ensinar ao Clone</div>
+    <div class="section-subtitle">// adicione memórias, opiniões, jeitos de ser</div>
+    <div class="teach-grid">
+      <div class="teach-card selected" onclick="selectCategory(this,'personalidade')">
+        <div class="card-icon">🎭</div>
+        <div class="card-title">Personalidade</div>
+        <div class="card-desc">Como você é, seus valores, seu jeito de ser</div>
+      </div>
+      <div class="teach-card" onclick="selectCategory(this,'opiniao')">
+        <div class="card-icon">💬</div>
+        <div class="card-title">Opinião</div>
+        <div class="card-desc">O que você pensa sobre assuntos do dia a dia</div>
+      </div>
+      <div class="teach-card" onclick="selectCategory(this,'historia')">
+        <div class="card-icon">📖</div>
+        <div class="card-title">História de Vida</div>
+        <div class="card-desc">Memórias, fatos, experiências importantes</div>
+      </div>
+      <div class="teach-card" onclick="selectCategory(this,'habito')">
+        <div class="card-icon">🔁</div>
+        <div class="card-title">Hábitos</div>
+        <div class="card-desc">O que você faz no dia a dia, rotinas</div>
+      </div>
+      <div class="teach-card" onclick="selectCategory(this,'conhecimento')">
+        <div class="card-icon">🧪</div>
+        <div class="card-title">Conhecimento</div>
+        <div class="card-desc">Coisas que você sabe, áreas de expertise</div>
+      </div>
+      <div class="teach-card" onclick="selectCategory(this,'personalidade')">
+        <div class="card-icon">❤️</div>
+        <div class="card-title">Gostos</div>
+        <div class="card-desc">O que você gosta, ama, odeia ou evita</div>
+      </div>
+    </div>
+    <div class="teach-form">
+      <div class="form-group">
+        <label>Título / Contexto</label>
+        <input class="form-input" id="teach-key" type="text" placeholder="Ex: Minha relação com dinheiro">
+      </div>
+      <div class="form-group">
+        <label>O que o clone deve saber</label>
+        <textarea class="form-textarea" id="teach-value" placeholder="Escreva com suas próprias palavras..."></textarea>
+      </div>
+      <button class="save-btn" id="save-memory-btn" onclick="saveMemory()">💾 Salvar na Memória</button>
+    </div>
+  </div>
+
+  <!-- MEMÓRIAS -->
+  <div class="section" id="tab-memorias">
+    <div class="section-title">Memórias do Clone</div>
+    <div class="section-subtitle">// tudo que você ensinou até agora</div>
+    <input class="search-input" type="text" placeholder="🔍 Buscar memórias..." oninput="filterMemories(this.value)">
+    <div class="memory-list" id="memory-list">
+      <div class="loading-overlay">Carregando memórias...</div>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="section" id="tab-config">
+    <div class="section-title">Configurações</div>
+    <div class="section-subtitle">// personalize seu clone</div>
+    <div class="config-section">
+      <div class="config-title">🔑 Chave API OpenRouter</div>
+      <input class="api-key-input" type="password" id="api-key-input" placeholder="sk-or-v1-...">
+      <div class="config-hint">
+        Crie grátis em <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a><br>
+        Salva no localStorage do seu browser.
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-title">👤 Nome do Clone</div>
+      <input class="form-input" type="text" id="clone-name-input" placeholder="Ex: Kikko, Cícero, Pai...">
+    </div>
+    <div class="config-section">
+      <div class="config-title">📝 Personalidade Base</div>
+      <textarea class="persona-textarea" id="persona-input" placeholder="Descreva como o clone deve se comportar..."></textarea>
+      <div class="config-hint">Salvo no Supabase — vale pra todos os dispositivos.</div>
+    </div>
+    <button class="save-config-btn" onclick="saveConfig()">💾 Salvar Configurações</button>
+    <div class="divider"></div>
+    <div class="config-section">
+      <div class="config-title">⚠️ Zona de Perigo</div>
+      <button onclick="clearAllMemories()" style="background:rgba(247,106,106,.15);border:1px solid rgba(247,106,106,.3);color:var(--danger);padding:10px 16px;border-radius:8px;cursor:pointer;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;">
+        🗑️ Apagar todas as memórias
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE ─────────────────────────────────────────
+const SUPABASE_URL = 'https://prpnjgzuktuhxqhoahpc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_IV2Z1UDAiksWyVonjZvpiw_Brjn4kNz';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── ESTADO ───────────────────────────────────────────
+let memories = [];
+let currentCategory = 'personalidade';
+let isLoading = false;
+let cloneName = 'Clone';
+let persona = '';
+
+// ─── INIT ──────────────────────────────────────────────
+async function init() {
+  // Chave da API fica no localStorage (não vai pro servidor)
+  const savedKey = localStorage.getItem('mindclone_apikey');
+  if (savedKey) document.getElementById('api-key-input').value = savedKey;
+
+  // Config e memórias vêm do Supabase
+  await loadConfig();
+  await loadMemories();
+}
+
+async function loadConfig() {
+  const { data } = await sb.from('mindclone_config').select('*').eq('id', 1).single();
+  if (data) {
+    cloneName = data.clone_name || 'Clone';
+    persona = data.persona || '';
+    document.getElementById('clone-name-input').value = cloneName;
+    document.getElementById('persona-input').value = persona;
+  }
+  updateStatusBar();
+}
+
+async function loadMemories() {
+  const { data } = await sb.from('mindclone_memorias').select('*').order('created_at', { ascending: true });
+  memories = data || [];
+  updateStatusBar();
+  renderMemories();
+}
+
+// ─── TABS ──────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'memorias') renderMemories();
+}
+
+// ─── STATUS ────────────────────────────────────────────
+function updateStatusBar() {
+  document.getElementById('clone-name-display').textContent = `${cloneName} — ${memories.length} memórias carregadas`;
+  document.getElementById('mem-count').textContent = `${memories.length} memórias`;
+}
+
+// ─── CHAT ──────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function getTime() {
+  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function addMessage(role, content) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  div.innerHTML = `
+    <div class="avatar ${role}">${role === 'clone' ? '🧠' : '👤'}</div>
+    <div>
+      <div class="bubble">${content.replace(/\n/g,'<br>')}</div>
+      <div class="bubble-meta">${getTime()}</div>
+    </div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'message clone';
+  div.id = 'typing-indicator';
+  div.innerHTML = `<div class="avatar clone">🧠</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+function buildSystemPrompt() {
+  let mem = '';
+  if (memories.length > 0) {
+    mem = '\n\n## MEMÓRIAS:\n';
+    memories.forEach(m => { mem += `\n[${m.category.toUpperCase()}] ${m.key}: ${m.value}`; });
+  }
+  return `${persona || 'Você é ' + cloneName + ', um clone digital desta pessoa.'}\n\n## INSTRUÇÕES RÍGIDAS:\n- Responda APENAS com o que está nas MEMÓRIAS abaixo\n- Use EXATAMENTE as palavras e expressões que estão nas memórias, mesmo com erros de português\n- NUNCA invente, complete, suponha ou acrescente informações que não estão nas memórias\n- NUNCA use palavras diferentes das que estão nas memórias\n- Se não tiver nada nas memórias sobre o assunto, responda APENAS: "Não sei, não me ensinaram isso ainda."\n- Nunca diga que é uma IA, responda em primeira pessoa${mem}`;
+}
+
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const apiKey = localStorage.getItem('mindclone_apikey') || document.getElementById('api-key-input').value.trim();
+  if (!apiKey) { toast('⚠️ Configure sua chave OpenRouter em "Config"!'); return; }
+
+  addMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+
+  // Histórico do DOM
+  const msgs = document.querySelectorAll('.message:not(#typing-indicator)');
+  const history = [];
+  msgs.forEach(m => {
+    const role = m.classList.contains('user') ? 'user' : 'model';
+    const content = m.querySelector('.bubble').innerText;
+    if (content) history.push({ role, parts: [{ text: content }] });
+  });
+
+  while (history.length > 0 && history[0].role !== 'user') history.shift();
+  const lastUserText = history.pop()?.parts[0].text || text;
+
+  const chatHistory = [];
+  for (const msg of history.slice(-10)) {
+    const last = chatHistory[chatHistory.length - 1];
+    if (!last || last.role !== msg.role) chatHistory.push(msg);
+  }
+
+  try {
+    const messages = [
+      { role: 'system', content: buildSystemPrompt() },
+      ...chatHistory.map(m => ({
+        role: m.role === 'model' ? 'assistant' : 'user',
+        content: m.parts[0].text
+      })),
+      { role: 'user', content: lastUserText }
+    ];
+
+    const payload = JSON.stringify({
+      model: 'openrouter/auto',
+      messages,
+      max_tokens: 1000,
+      temperature: 0.9
+    });
+
+    const data = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://openrouter.ai/api/v1/chat/completions');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + apiKey.replace(/[^\x20-\x7E]/g, '').trim());
+      xhr.onload = () => {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch(e) { reject(new Error('Resposta invalida')); }
+      };
+      xhr.onerror = () => reject(new Error('Erro de conexao'));
+      xhr.send(payload);
+    });
+
+    removeTyping();
+
+    if (data.choices?.[0]?.message?.content) {
+      let reply = data.choices[0].message.content;
+      reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      addMessage('clone', reply);
+    } else if (data.error) {
+      addMessage('clone', '⚠️ Erro da API: ' + data.error.message);
+    } else {
+      addMessage('clone', '⚠️ Resposta inesperada. Tente novamente.');
+    }
+  } catch (err) {
+    removeTyping();
+    addMessage('clone', '⚠️ Erro: ' + err.message);
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ─── ENSINAR ───────────────────────────────────────────
+function selectCategory(el, cat) {
+  document.querySelectorAll('.teach-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  currentCategory = cat;
+}
+
+async function saveMemory() {
+  const key = document.getElementById('teach-key').value.trim();
+  const value = document.getElementById('teach-value').value.trim();
+  if (!key || !value) { toast('⚠️ Preencha o título e o conteúdo!'); return; }
+
+  const btn = document.getElementById('save-memory-btn');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  const { data, error } = await sb.from('mindclone_memorias').insert([{
+    key, value, category: currentCategory
+  }]).select().single();
+
+  btn.disabled = false;
+  btn.textContent = '💾 Salvar na Memória';
+
+  if (error) { toast('⚠️ Erro ao salvar: ' + error.message); return; }
+
+  memories.push(data);
+  document.getElementById('teach-key').value = '';
+  document.getElementById('teach-value').value = '';
+  updateStatusBar();
+  renderMemories();
+  toast('✅ Memória salva!');
+}
+
+// ─── MEMÓRIAS ──────────────────────────────────────────
+function renderMemories(filter = '') {
+  const list = document.getElementById('memory-list');
+  const filtered = memories.filter(m =>
+    m.key.toLowerCase().includes(filter.toLowerCase()) ||
+    m.value.toLowerCase().includes(filter.toLowerCase())
+  );
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🧠</div><div>${filter ? 'Nenhuma encontrada.' : 'Nenhuma memória ainda.<br>Vá em "Ensinar"!'}</div></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(m => `
+    <div class="memory-item">
+      <span class="memory-tag tag-${m.category}">${m.category}</span>
+      <div class="memory-content">
+        <div class="memory-key">${m.key}</div>
+        <div class="memory-value">${m.value}</div>
+      </div>
+      <button class="delete-btn" onclick="deleteMemory(${m.id})">✕</button>
+    </div>`).join('');
+}
+
+function filterMemories(v) { renderMemories(v); }
+
+async function deleteMemory(id) {
+  await sb.from('mindclone_memorias').delete().eq('id', id);
+  memories = memories.filter(m => m.id !== id);
+  updateStatusBar();
+  renderMemories();
+  toast('🗑️ Memória removida.');
+}
+
+async function clearAllMemories() {
+  if (!confirm('Apagar TODAS as memórias?')) return;
+  await sb.from('mindclone_memorias').delete().neq('id', 0);
+  memories = [];
+  updateStatusBar();
+  renderMemories();
+  toast('🗑️ Tudo apagado.');
+}
+
+// ─── CONFIG ────────────────────────────────────────────
+async function saveConfig() {
+  const apiKey = document.getElementById('api-key-input').value.replace(/[^\x20-\x7E]/g, '').trim();
+  cloneName = document.getElementById('clone-name-input').value.trim() || 'Clone';
+  persona = document.getElementById('persona-input').value.trim();
+
+  // Chave fica só no localStorage
+  if (apiKey) localStorage.setItem('mindclone_apikey', apiKey);
+
+  // Nome e persona vão pro Supabase
+  await sb.from('mindclone_config').upsert({ id: 1, clone_name: cloneName, persona, updated_at: new Date().toISOString() });
+
+  updateStatusBar();
+  toast('✅ Configurações salvas!');
+}
+
+// ─── TOAST ─────────────────────────────────────────────
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+init();
+</script>
+</body>
+</html>
